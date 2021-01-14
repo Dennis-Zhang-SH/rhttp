@@ -148,7 +148,7 @@ async fn handle_connection(app: Arc<App>, mut socket: TcpStream) {
                             "{:?} {}\r\nContent-Length:21\r\nContent-Type: text/plain\r\n\r\n{}",
                             Version::HTTP_11,
                             StatusCode::INTERNAL_SERVER_ERROR,
-                            e,
+                            "Internal server error",
                         )
                         .as_bytes(),
                     )
