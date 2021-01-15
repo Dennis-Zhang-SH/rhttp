@@ -44,19 +44,37 @@ impl Request {
 
     async fn read_body(&mut self, socket: &mut TcpStream, body: &str) {
         match self.headers.get("Connection") {
-            Some(c) if c[0] == "keep-alive" => {
-                if let Ok(length) = self.headers.get("Content-Length").unwrap()[0].parse::<usize>()
-                {
-                    if length != body.len() {
-                        let mut buf = Vec::with_capacity(length - body.len());
-                        let _ = socket.read(&mut buf).await;
-                        self.body += &String::from_utf8_lossy(&buf);
+            Some(c) if c[0] != "keep-alive" => return,
+            _ => {
+                match self.headers.get("Content-Length") {
+                    Some(length) => {
+                        let length = &length[0];
+                        match length.parse::<usize>() {
+                            Ok(length) => {
+                                if length != body.len() {
+                                    let mut buf = Vec::with_capacity(length - body.len());
+                                    let _ = socket.read(&mut buf).await;
+                                    self.body += body;
+                                    self.body += &String::from_utf8_lossy(&buf);
+                                }
+                            }
+                            Err(_) => return,
+                        }
                     }
+                    _ => return,
+                }
+                match self.headers.get("Transfer-Encoding") {
+                    Some(t) if t[0] == "chunked" => {
+                        // todo: chucked transfer
+                        // let chunked_vec: Vec<_> = body.split("\r\n").collect();
+                    }
+                    _ => return,
                 }
             }
-            _ => return,
         }
     }
+
+    async fn read_chunked_body(&self) {}
 }
 
 impl Response {
