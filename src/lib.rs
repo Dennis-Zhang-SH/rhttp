@@ -6,8 +6,9 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
-type HandleFunction = Box<dyn (Fn(&Request, Response) -> Response) + Send + Sync>;
+type HandleFunction = Box<dyn (Fn(&Request) -> Response) + Send + Sync>;
 
+#[derive(Debug, Clone)]
 pub struct Request {
     pub method: String,
     pub url: String,
@@ -19,10 +20,11 @@ pub struct Request {
     pub body: String,
 }
 
+#[derive(Debug)]
 pub struct Response {
-    pub http_status: String,
+    pub http_status: http::StatusCode,
     pub headers: HashMap<String, Vec<String>>,
-    pub body: String,
+    pub body: Option<String>,
 }
 
 impl Request {
@@ -74,21 +76,20 @@ impl Request {
         }
     }
 
-    async fn read_chunked_body(&self) {}
+    async fn _read_chunked_body(&self) {}
 }
 
 impl Response {
-    pub fn new() -> Self {
-        Response {
-            http_status: String::new(),
+    pub fn new(status: u16) -> Result<Self, http::status::InvalidStatusCode> {
+        Ok(Response {
+            http_status: StatusCode::from_u16(status)?,
             headers: HashMap::new(),
-            body: String::new(),
-        }
+            body: None,
+        })
     }
 
     pub fn set_status(&mut self, status: u16) -> Result<(), http::status::InvalidStatusCode> {
-        let status = StatusCode::from_u16(status)?;
-        self.http_status = format!("{}", status);
+        self.http_status = StatusCode::from_u16(status)?;
         Ok(())
     }
 
@@ -97,20 +98,27 @@ impl Response {
     }
 
     pub fn set_body(&mut self, body: String) {
-        self.body = body;
+        self.body = Some(body);
     }
 
-    pub fn append_body(&mut self, body: &str) {
-        self.body += body;
+    pub fn append_body(&mut self, body: String) {
+        match self.body.as_mut() {
+            Some(b) => b.push_str(body.as_str()),
+            None => self.set_body(body),
+        }
     }
 
-    pub async fn response_to(&mut self, s: &mut TcpStream) {
+    pub async fn response_to(mut self, s: &mut TcpStream) {
         self.headers
             .insert("Connection".to_string(), vec!["keep-alive".to_string()]);
-        self.headers.insert(
-            "Content-Length".to_string(),
-            vec![self.body.len().to_string()],
-        );
+
+        match self.body {
+            Some(ref body) => {
+                self.headers
+                    .insert("Content-Length".to_string(), vec![body.len().to_string()]);
+            }
+            None => {}
+        }
         let mut header_string = String::new();
         for header in self.headers.iter() {
             header_string += format!("{}: {}\r\n", header.0, header.1.join(",")).as_str();
@@ -120,7 +128,7 @@ impl Response {
             Version::HTTP_11,
             self.http_status,
             header_string,
-            self.body
+            self.body.unwrap_or("".to_string())
         );
         let _ = s.write_all(reponse.as_bytes()).await;
     }
@@ -209,7 +217,7 @@ async fn handle_connection(app: Arc<App>, mut socket: TcpStream) {
 
         match app.handle_functions.get(&request.path) {
             Some(f) => {
-                let mut response = f(&request, Response::new());
+                let response = f(&request);
                 response.response_to(&mut socket).await;
             }
             _ => {
