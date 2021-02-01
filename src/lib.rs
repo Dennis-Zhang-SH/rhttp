@@ -135,7 +135,7 @@ impl Response {
 }
 
 pub struct App {
-    pub handle_functions: HashMap<String, HandleFunction>,
+    pub handle_functions: HashMap<&'static str, HandleFunction>,
 }
 
 impl App {
@@ -145,7 +145,7 @@ impl App {
         }
     }
 
-    pub fn register(mut self, path: String, f: HandleFunction) -> Self {
+    pub fn register(mut self, path: &'static str, f: HandleFunction) -> Self {
         self.handle_functions.insert(path, f);
         self
     }
@@ -215,7 +215,7 @@ async fn handle_connection(app: Arc<App>, mut socket: TcpStream) {
 
         request.read_body(&mut socket, request_vec[1]).await;
 
-        match app.handle_functions.get(&request.path) {
+        match app.handle_functions.get(&request.path.as_str()) {
             Some(f) => {
                 let response = f(&request);
                 response.response_to(&mut socket).await;
