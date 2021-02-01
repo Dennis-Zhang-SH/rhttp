@@ -11,9 +11,6 @@ it's literally written in bad codes, e.g. allocated too much.
 use rhttp::{App, Response};
 
 #[tokio::main]
-use rhttp::{App, Response};
-
-#[tokio::main]
 async fn main() {
     let _ = App::new()
         .register(
