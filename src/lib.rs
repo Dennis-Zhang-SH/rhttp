@@ -46,7 +46,10 @@ impl Request {
 
     async fn read_body(&mut self, socket: &mut TcpStream, body: &str) {
         match self.headers.get("Connection") {
-            Some(c) if c[0] != "keep-alive" => return,
+            Some(c) if c[0] != "keep-alive" => {
+                self.body += body;
+                return;
+            }
             _ => {
                 match self.headers.get("Content-Length") {
                     Some(length) => {
@@ -58,6 +61,8 @@ impl Request {
                                     let _ = socket.read(&mut buf).await;
                                     self.body += body;
                                     self.body += &String::from_utf8_lossy(&buf);
+                                } else {
+                                    self.body += body;
                                 }
                             }
                             Err(_) => return,
@@ -121,20 +126,23 @@ impl Response {
                 self.headers
                     .insert("Content-Length".to_string(), vec![body.len().to_string()]);
             }
-            None => {}
+            None => {
+                self.headers
+                    .insert("Content-Length".to_string(), vec!["0".to_string()]);
+            }
         }
         let mut header_string = String::new();
         for header in self.headers.iter() {
             header_string += format!("{}: {}\r\n", header.0, header.1.join(",")).as_str();
         }
-        let reponse = format!(
+        let response = format!(
             "{:?} {}\r\n{}\r\n{}",
             Version::HTTP_11,
             self.http_status,
             header_string,
             self.body.unwrap_or("".to_string())
         );
-        let _ = s.write_all(reponse.as_bytes()).await;
+        let _ = s.write_all(response.as_bytes()).await;
     }
 }
 
@@ -216,7 +224,6 @@ async fn handle_connection(app: Arc<App>, mut socket: TcpStream) {
                 return;
             }
         };
-
         request.read_body(&mut socket, request_vec[1]).await;
 
         match app.handle_functions.get(&request.path.as_str()) {
