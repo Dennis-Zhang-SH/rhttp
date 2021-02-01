@@ -1,3 +1,16 @@
+# RHTTP is a toy HTTP framework
+it's more a rust learning project than a production HTTP framework
+
+## RHTTP is NOT very fast
+it's literally written in bad codes, e.g. allocated too much.
+
+## RHTTP is simple enough for beginners to try
+**usage**:
+
+```rust
+use rhttp::{App, Response};
+
+#[tokio::main]
 use rhttp::{App, Response};
 
 #[tokio::main]
@@ -31,3 +44,6 @@ async fn main() {
         .run("127.0.0.1:8080")
         .await;
 }
+```
+
+in the above example, matching "/" in the url would return a response which header contains a "Content-Type" and body contains a "hello, world".

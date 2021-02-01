@@ -77,6 +77,10 @@ impl Request {
     }
 
     async fn _read_chunked_body(&self) {}
+
+    pub fn body(&self) -> &String {
+        &self.body
+    }
 }
 
 impl Response {
