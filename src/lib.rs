@@ -58,6 +58,7 @@ impl Request {
                             Ok(length) => {
                                 if length != body.len() {
                                     let mut buf = Vec::with_capacity(length - body.len());
+                                    buf.resize_with(length - body.len(), Default::default);
                                     let _ = socket.read(&mut buf).await;
                                     self.body += body;
                                     self.body += &String::from_utf8_lossy(&buf);
